@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Color, Mesh } from 'three';
-import { TileData } from '../types';
+import { TileData, TileStatus } from '../types';
 import { useGameStore } from '../store';
 import { Crop } from './Crop';
 
@@ -10,36 +10,56 @@ interface FarmTileProps {
   position: [number, number, number];
 }
 
+// Simple weed geometry
+const Weed: React.FC = () => {
+  return (
+    <group position={[0, 0.2, 0]}>
+      {/* Jagged spikes */}
+      {[0, 1, 2, 3].map((i) => (
+        <mesh key={i} rotation={[0, i * (Math.PI / 2), Math.PI / 6]} position={[0, 0, 0]}>
+           <coneGeometry args={[0.1, 0.4, 3]} />
+           <meshStandardMaterial color="#8B0000" />
+        </mesh>
+      ))}
+    </group>
+  );
+};
+
 export const FarmTile: React.FC<FarmTileProps> = ({ data, position }) => {
   const meshRef = useRef<Mesh>(null);
-  const { handleTileClick, activeTileIds } = useGameStore();
+  const { handleTileClick } = useGameStore();
   const [hovered, setHovered] = useState(false);
 
-  // Derived state: Check if this tile ID is in the active array
-  const isActive = activeTileIds.includes(data.id);
+  // Derived state
+  const isTarget = data.status === TileStatus.GROWTH_TARGET;
+  const isWeed = data.status === TileStatus.WEED;
 
   // Animation logic
   useFrame((state) => {
     if (meshRef.current) {
-      // Gentle bobbing if active to attract attention
+      // Gentle bobbing if active
+      const isActive = isTarget || isWeed;
       const targetY = position[1] + (isActive ? Math.sin(state.clock.elapsedTime * 5) * 0.1 + 0.1 : 0);
-      // Smooth lerp for Y position
       meshRef.current.position.y += (targetY - meshRef.current.position.y) * 0.1;
 
-      // Color transition logic manually for performance
+      // Color transition
       const material = meshRef.current.material as any;
       
       let targetColor = new Color("#5D4037"); // Default Dirt Brown
       let targetEmissive = new Color("#000000");
       let targetEmissiveIntensity = 0;
 
-      if (isActive) {
-        // Gold/Yellow glow for active target - High visibility
-        targetColor = new Color("#D2691E"); // Chocolate
-        targetEmissive = new Color("#FFD700"); // Gold
+      if (isTarget) {
+        // Gold/Yellow glow for growth target
+        targetColor = new Color("#D2691E"); 
+        targetEmissive = new Color("#FFD700"); 
         targetEmissiveIntensity = 0.5;
+      } else if (isWeed) {
+        // Red glow for weed
+        targetColor = new Color("#5D4037"); 
+        targetEmissive = new Color("#FF0000"); // Red Warning
+        targetEmissiveIntensity = 0.6;
       } else if (hovered) {
-        // Slight highlight on hover
         targetColor = new Color("#6D5047");
       }
 
@@ -51,16 +71,11 @@ export const FarmTile: React.FC<FarmTileProps> = ({ data, position }) => {
 
   return (
     <group position={[position[0], 0, position[2]]}>
-      {/* 
-        THE CLICK TARGET
-        This box mesh acts as the Raycast receiver.
-        The pointer events are naturally handled by R3F.
-      */}
       <mesh
         ref={meshRef}
-        position={[0, 0, 0]} // Initial local position
+        position={[0, 0, 0]} 
         onClick={(e) => {
-          e.stopPropagation(); // Prevent clicking through to ground
+          e.stopPropagation(); 
           handleTileClick(data.id);
         }}
         onPointerOver={() => {
@@ -72,7 +87,6 @@ export const FarmTile: React.FC<FarmTileProps> = ({ data, position }) => {
           document.body.style.cursor = 'default';
         }}
       >
-        {/* BoxGeometry: Width, Height, Depth. Height is small to look like a tile */}
         <boxGeometry args={[0.9, 0.2, 0.9]} />
         <meshStandardMaterial 
           roughness={1} 
@@ -80,10 +94,9 @@ export const FarmTile: React.FC<FarmTileProps> = ({ data, position }) => {
         />
       </mesh>
 
-      {/* The Crop sits on top of the tile */}
+      {/* The Crop or Weed sits on top */}
       <group position={[0, 0.1, 0]}>
-         {/* Pass position 0,0,0 relative to parent group */}
-        <Crop stage={data.stage} />
+         {isWeed ? <Weed /> : <Crop stage={data.stage} />}
       </group>
     </group>
   );

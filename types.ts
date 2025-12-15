@@ -8,11 +8,20 @@ export enum GrowthStage {
   HARVESTED = 4
 }
 
+// Tile status helps distinguish between a normal growth target and a weed target
+export enum TileStatus {
+  IDLE = 'IDLE',
+  GROWTH_TARGET = 'GROWTH_TARGET', // Yellow Light
+  WEED = 'WEED' // Red Light (Persistent until clicked)
+}
+
 export interface TileData {
   id: number;
   row: number;
   col: number;
   stage: GrowthStage;
+  status: TileStatus; // Replaces simple "active" check
+  activeSince?: number; // Timestamp when status changed to non-IDLE
 }
 
 export interface BearData {
@@ -41,6 +50,12 @@ export enum Season {
   WINTER = 'WINTER'
 }
 
+export enum DecorationType {
+  HOUSE = 'HOUSE',
+  WINDMILL = 'WINDMILL',
+  WATER_WHEEL = 'WATER_WHEEL'
+}
+
 export interface LevelConfig {
   levelNumber: number;
   tileCount: number; // 9, 16, 25
@@ -58,8 +73,12 @@ export interface GameState {
   
   tiles: TileData[];
   score: number;
-  bearsShooed: number; // New Statistic
-  activeTileIds: number[]; // Array for multiple targets
+  misses: number; // New: Track missed targets
+  coins: number; // Currency
+  inventory: DecorationType[]; // Purchased items
+  
+  bearsShooed: number;
+  // removed activeTileIds in favor of TileData.status for more complex state
   
   timeLeft: number; // Remaining seconds
   
@@ -69,12 +88,15 @@ export interface GameState {
   setAppMode: (mode: AppMode) => void;
   startStoryMode: () => void;
   startLevelSelect: () => void;
-  startLevel: (levelIndex: number) => void; // 1, 2, 3
+  startLevel: (levelIndex: number) => void;
   advanceLevel: () => void;
   retryLevel: () => void;
   stopGame: () => void; // Pause
   resumeGame: () => void;
   exitToMenu: () => void;
+  
+  // Economy Actions
+  buyDecoration: (type: DecorationType, cost: number) => void;
   
   // Game Loop Actions
   tickTimer: (delta: number) => void; // Decrease time
@@ -85,45 +107,4 @@ export interface GameState {
   spawnBear: () => void;
   shooBear: () => void;
   bearAttack: () => void;
-}
-
-// Augment global JSX namespace for React Three Fiber elements
-declare global {
-  namespace JSX {
-    interface IntrinsicElements {
-      group: any;
-      mesh: any;
-      meshStandardMaterial: any;
-      cylinderGeometry: any;
-      capsuleGeometry: any;
-      dodecahedronGeometry: any;
-      sphereGeometry: any;
-      boxGeometry: any;
-      coneGeometry: any;
-      planeGeometry: any;
-      ambientLight: any;
-      directionalLight: any;
-      primitive: any;
-    }
-  }
-
-  namespace React {
-    namespace JSX {
-      interface IntrinsicElements {
-        group: any;
-        mesh: any;
-        meshStandardMaterial: any;
-        cylinderGeometry: any;
-        capsuleGeometry: any;
-        dodecahedronGeometry: any;
-        sphereGeometry: any;
-        boxGeometry: any;
-        coneGeometry: any;
-        planeGeometry: any;
-        ambientLight: any;
-        directionalLight: any;
-        primitive: any;
-      }
-    }
-  }
 }

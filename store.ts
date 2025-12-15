@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { GameState, GrowthStage, TileData, BearData, AppMode, GamePhase, LevelConfig, Season } from './types';
+import { GameState, GrowthStage, TileData, BearData, AppMode, GamePhase, LevelConfig, Season, TileStatus, DecorationType } from './types';
 
 // Updated configs with Seasons
 const LEVEL_CONFIGS: Record<number, LevelConfig> = {
@@ -14,7 +14,7 @@ const createRandomTiles = (count: number, boundary: number): TileData[] => {
   const usedPositions = new Set<string>();
   
   // Always include center (0,0) to anchor the map
-  tiles.push({ id: 0, row: 0, col: 0, stage: GrowthStage.DIRT });
+  tiles.push({ id: 0, row: 0, col: 0, stage: GrowthStage.DIRT, status: TileStatus.IDLE });
   usedPositions.add("0,0");
 
   let idCounter = 1;
@@ -31,7 +31,8 @@ const createRandomTiles = (count: number, boundary: number): TileData[] => {
         id: idCounter++,
         row: r,
         col: c,
-        stage: GrowthStage.DIRT
+        stage: GrowthStage.DIRT,
+        status: TileStatus.IDLE
       });
     }
   }
@@ -44,8 +45,10 @@ export const useGameStore = create<GameState>((set, get) => ({
   currentLevel: 1,
   tiles: [],
   score: 0,
+  misses: 0,
+  coins: 0, // Init coins
+  inventory: [], // Init inventory
   bearsShooed: 0,
-  activeTileIds: [],
   timeLeft: 0,
   bearData: null,
 
@@ -57,7 +60,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       currentLevel: 1, 
       gamePhase: GamePhase.INTRO_TEXT,
       score: 0,
-      bearsShooed: 0
+      misses: 0,
+      bearsShooed: 0,
+      inventory: [] // Reset inventory on new story start? Or keep it? Let's reset for fresh game.
     });
   },
 
@@ -66,6 +71,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       appMode: AppMode.LEVEL_SELECT,
       gamePhase: GamePhase.IDLE,
       score: 0,
+      misses: 0,
       bearsShooed: 0
     });
   },
@@ -78,10 +84,10 @@ export const useGameStore = create<GameState>((set, get) => ({
       currentLevel: levelIndex,
       tiles: createRandomTiles(config.tileCount, config.gridBoundary),
       timeLeft: config.duration,
-      activeTileIds: [],
       bearData: null,
       gamePhase: GamePhase.PLAYING,
-      bearsShooed: 0 // Reset level stats
+      bearsShooed: 0,
+      misses: 0 // Reset level stats
     });
   },
 
@@ -92,7 +98,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       set({ 
         currentLevel: nextLevel, 
         gamePhase: GamePhase.INTRO_TEXT,
-        bearsShooed: 0
+        bearsShooed: 0,
+        misses: 0
       });
     } else {
       // End of game loop, back to menu
@@ -114,41 +121,120 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   exitToMenu: () => {
-    set({ appMode: AppMode.MENU, gamePhase: GamePhase.IDLE, tiles: [], activeTileIds: [] });
+    set({ appMode: AppMode.MENU, gamePhase: GamePhase.IDLE, tiles: [] });
+  },
+
+  buyDecoration: (type: DecorationType, cost: number) => {
+    const { coins, inventory } = get();
+    if (coins >= cost) {
+      set({
+        coins: coins - cost,
+        inventory: [...inventory, type]
+      });
+    }
   },
 
   tickTimer: (delta: number) => {
-    const { gamePhase, timeLeft } = get();
+    const { gamePhase, timeLeft, tiles, score, coins, misses } = get();
     if (gamePhase !== GamePhase.PLAYING) return;
+
+    const now = Date.now();
+    let newTiles = [...tiles];
+    let missIncrement = 0;
+    let hasChanges = false;
+
+    // Check for expired Growth Targets (Yellow Lights)
+    // Rule: Yellow lights stay for 2 seconds (2000ms)
+    // Weeds (Red Lights) are persistent until clicked (as per previous logic), so we don't expire them here.
+    newTiles = newTiles.map(t => {
+       if (t.status === TileStatus.GROWTH_TARGET && t.activeSince) {
+          if (now - t.activeSince > 2000) {
+              hasChanges = true;
+              missIncrement++;
+              return { ...t, status: TileStatus.IDLE, activeSince: undefined };
+          }
+       }
+       return t;
+    });
+
+    if (hasChanges) {
+        // Apply penalties for misses immediately
+        const penalty = missIncrement * 5;
+        const newScore = Math.max(0, score - penalty);
+        set({ 
+            tiles: newTiles, 
+            misses: misses + missIncrement,
+            score: newScore 
+        });
+        // We continue to tick time
+    }
 
     const newTime = timeLeft - delta;
     if (newTime <= 0) {
-      set({ timeLeft: 0, gamePhase: GamePhase.LEVEL_COMPLETE, activeTileIds: [] });
+      // LEVEL END LOGIC
+      
+      // 1. Calculate penalty for remaining weeds
+      const weedCount = tiles.filter(t => t.status === TileStatus.WEED).length;
+      const penalty = weedCount * 5;
+      const finalScore = Math.max(0, score - penalty); // Score might have already been reduced by real-time misses
+      
+      // 2. Convert Score to Coins
+      const earnedCoins = finalScore;
+
+      set({ 
+        timeLeft: 0, 
+        gamePhase: GamePhase.LEVEL_COMPLETE,
+        score: finalScore,
+        coins: coins + earnedCoins
+      });
     } else {
       set({ timeLeft: newTime });
     }
   },
 
   triggerNextBeat: () => {
-    const { currentLevel, tiles, activeTileIds, spawnBear } = get();
+    const { currentLevel, tiles, spawnBear } = get();
     const config = LEVEL_CONFIGS[currentLevel];
     
-    const availableTiles = tiles.filter(t => !activeTileIds.includes(t.id));
+    // Filter tiles that are IDLE (Not growing target, and NOT A WEED)
+    const availableTiles = tiles.filter(t => t.status === TileStatus.IDLE);
     
     if (availableTiles.length === 0) return;
 
     const countToPick = Math.min(config.simultaneousTargets, availableTiles.length);
-    const newIds: number[] = [];
+    let newTiles = [...tiles];
     
-    const pool = [...availableTiles];
+    // Create a pool of indices from the available tiles
+    // We map back to original tile IDs to update the main array
+    const availableIds = availableTiles.map(t => t.id);
+    
+    const now = Date.now();
 
     for (let i = 0; i < countToPick; i++) {
-        const randomIndex = Math.floor(Math.random() * pool.length);
-        newIds.push(pool[randomIndex].id);
-        pool.splice(randomIndex, 1);
+        if (availableIds.length === 0) break;
+
+        const randomIndex = Math.floor(Math.random() * availableIds.length);
+        const selectedId = availableIds[randomIndex];
+        availableIds.splice(randomIndex, 1); // remove from pool
+
+        // Determine Event Type
+        // Level 1: 100% Growth
+        // Level 2+: 30% Weed, 70% Growth
+        let eventType = TileStatus.GROWTH_TARGET;
+        if (currentLevel > 1 && Math.random() < 0.3) {
+           eventType = TileStatus.WEED;
+        }
+
+        newTiles = newTiles.map(t => {
+            if (t.id === selectedId) {
+                // Set activeSince for timeout logic
+                return { ...t, status: eventType, activeSince: now };
+            }
+            return t;
+        });
     }
 
-    set({ activeTileIds: newIds });
+    set({ tiles: newTiles });
 
     if (Math.random() < 0.25) {
       spawnBear();
@@ -156,29 +242,37 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   handleTileClick: (clickedId: number) => {
-    const { activeTileIds, tiles, score, gamePhase } = get();
+    const { tiles, score, gamePhase } = get();
     
     if (gamePhase !== GamePhase.PLAYING) return;
 
-    if (activeTileIds.includes(clickedId)) {
-      // SUCCESS
+    const clickedTile = tiles.find(t => t.id === clickedId);
+    if (!clickedTile) return;
+
+    // Logic for WEED
+    if (clickedTile.status === TileStatus.WEED) {
+       // Clear weed, return to IDLE
+       const newTiles = tiles.map(t => t.id === clickedId ? { ...t, status: TileStatus.IDLE, activeSince: undefined } : t);
+       set({ tiles: newTiles });
+       return;
+    }
+
+    // Logic for GROWTH
+    if (clickedTile.status === TileStatus.GROWTH_TARGET) {
+      // Success
       const newTiles = tiles.map(t => {
         if (t.id === clickedId) {
           const nextStage = t.stage < GrowthStage.MATURE ? t.stage + 1 : GrowthStage.DIRT;
-          return { ...t, stage: nextStage };
+          return { ...t, stage: nextStage, status: TileStatus.IDLE, activeSince: undefined };
         }
         return t;
       });
 
-      const clickedTile = tiles.find(t => t.id === clickedId);
-      const points = clickedTile?.stage === GrowthStage.SAPLING ? 50 : 10;
+      const points = clickedTile.stage === GrowthStage.SAPLING ? 50 : 10;
       
-      const newActiveIds = activeTileIds.filter(id => id !== clickedId);
-
       set({ 
         tiles: newTiles, 
-        score: score + points,
-        activeTileIds: newActiveIds
+        score: score + points
       });
     }
   },
@@ -236,7 +330,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     let newTiles = [...tiles];
     if (targetTile) {
       // @ts-ignore
-      newTiles = tiles.map(t => t.id === targetTile.id ? { ...t, stage: GrowthStage.DIRT } : t);
+      newTiles = tiles.map(t => t.id === targetTile.id ? { ...t, stage: GrowthStage.DIRT, status: TileStatus.IDLE, activeSince: undefined } : t);
     }
 
     set({
