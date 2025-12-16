@@ -1,7 +1,7 @@
 import React from 'react';
 import { useGameStore } from '../store';
-import { AppMode, GamePhase, GrowthStage, TileStatus } from '../types';
-import { SHOP_ITEMS, LEVELS } from '../gameConfig';
+import { AppMode, GamePhase, GrowthStage, TileStatus, DecorationType } from '../types';
+import { SHOP_ITEMS, LEVELS, GAME_CONSTANTS } from '../gameConfig';
 
 // --- SUB-COMPONENTS ---
 
@@ -15,6 +15,34 @@ const MainMenu = () => {
         <div className="space-y-4">
           <button onClick={startStoryMode} className="w-full bg-orange-500 hover:bg-orange-400 text-white text-2xl font-bold py-4 rounded-xl shadow-lg transition active:scale-95">Start Story</button>
           <button onClick={startLevelSelect} className="w-full bg-blue-500 hover:bg-blue-400 text-white text-xl font-bold py-4 rounded-xl shadow-lg transition active:scale-95">Select Level</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const VictoryScreen = () => {
+  const { startStoryMode, exitToMenu, coins } = useGameStore();
+  return (
+    <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-md p-6 z-50">
+      <div className="bg-yellow-50 p-8 md:p-12 rounded-2xl shadow-2xl max-w-2xl w-full text-center border-4 border-yellow-500">
+        <div className="text-6xl mb-4">🏆</div>
+        <h1 className="text-4xl md:text-5xl font-black text-yellow-800 mb-4">Congratulations!</h1>
+        <p className="text-2xl md:text-3xl font-bold text-green-700 mb-2">You are a Successful Retired Farmer!</p>
+        <p className="text-xl text-gray-600 mb-8 italic">The harvest is bountiful and your farm is beautiful.</p>
+        
+        <div className="bg-white/60 p-6 rounded-xl border-2 border-yellow-200 mb-8 inline-block">
+             <div className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-1">Final Wealth</div>
+             <div className="text-5xl font-black text-orange-500">{coins} <span className="text-2xl text-gray-600">Coins</span></div>
+        </div>
+
+        <div className="flex flex-col gap-4 max-w-sm mx-auto">
+          <button onClick={startStoryMode} className="w-full bg-green-600 hover:bg-green-500 text-white text-xl font-bold py-4 rounded-xl shadow-lg transition transform active:scale-95 border-b-4 border-green-800">
+             Play Again
+          </button>
+          <button onClick={exitToMenu} className="w-full bg-blue-500 hover:bg-blue-400 text-white text-xl font-bold py-4 rounded-xl shadow-lg transition transform active:scale-95 border-b-4 border-blue-700">
+             Back to Main Menu
+          </button>
         </div>
       </div>
     </div>
@@ -56,7 +84,7 @@ const StoryIntro = () => {
 };
 
 const HUD = () => {
-  const { score, coins, misses, tiles, timeLeft, currentLevel, gamePhase, stopGame, resumeGame, exitToMenu } = useGameStore();
+  const { score, coins, misses, tiles, timeLeft, currentLevel, gamePhase, stopGame, resumeGame, exitToMenu, isMuted, toggleMute, fenceCount, isPlacingFence, toggleFencePlacement } = useGameStore();
   const treeCount = tiles.filter(t => t.stage !== GrowthStage.DIRT).length;
   
   return (
@@ -82,7 +110,12 @@ const HUD = () => {
           </div>
           
           <div className="flex flex-col items-end gap-2">
-             <span className="bg-blue-600 text-white px-3 py-1 rounded-full text-sm font-bold shadow">Level {currentLevel}</span>
+             <div className="flex gap-2">
+               <button onClick={toggleMute} className="bg-white/90 p-2 rounded-lg shadow border-2 border-gray-300 hover:bg-gray-100 transition active:scale-95">
+                  <span className="text-xl">{isMuted ? "🔇" : "🔊"}</span>
+               </button>
+               <span className="bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-bold shadow flex items-center">Level {currentLevel}</span>
+             </div>
              <div className={`bg-white/90 p-3 rounded-xl shadow-lg border-2 min-w-[90px] text-center ${timeLeft < 10 ? 'border-red-500 animate-pulse' : 'border-blue-400'}`}>
                 <div className="text-xs font-bold text-gray-600 uppercase">Time</div>
                 <div className={`text-3xl font-black ${timeLeft < 10 ? 'text-red-600' : 'text-blue-600'}`}>{Math.ceil(timeLeft)}</div>
@@ -90,11 +123,35 @@ const HUD = () => {
           </div>
        </div>
 
-       {/* Bottom/Pause Controls */}
-       <div className="flex justify-center pointer-events-auto">
+       {/* Middle: Action Tips (When placing fence) */}
+       {isPlacingFence && (
+           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="bg-black/60 text-white px-6 py-3 rounded-xl text-xl font-bold animate-pulse backdrop-blur-sm border-2 border-white">
+                    Click any tile to place protection fence!
+                </div>
+           </div>
+       )}
+
+       {/* Bottom/Pause Controls + Action Bar */}
+       <div className="flex flex-col gap-4 items-center pointer-events-auto">
           {gamePhase === GamePhase.PLAYING && (
-            <button onClick={stopGame} className="bg-red-500/90 text-white font-bold py-2 px-8 rounded-full shadow-lg border-2 border-red-700 active:scale-95">PAUSE</button>
+            <div className="flex gap-4 items-end">
+                {/* Fence Button */}
+                <button 
+                    onClick={toggleFencePlacement}
+                    className={`relative group flex flex-col items-center p-3 rounded-xl border-4 transition transform active:scale-95 ${isPlacingFence ? 'bg-orange-200 border-orange-500 scale-110' : 'bg-white/90 border-gray-300 hover:bg-gray-100'}`}
+                >
+                    <span className="text-3xl">🚧</span>
+                    <span className="font-bold text-xs text-gray-700">Fence</span>
+                    <div className="absolute -top-3 -right-3 bg-red-600 text-white w-8 h-8 rounded-full flex items-center justify-center border-2 border-white font-bold shadow">
+                        {fenceCount}
+                    </div>
+                </button>
+                
+                <button onClick={stopGame} className="bg-red-500/90 text-white font-bold py-3 px-8 rounded-full shadow-lg border-2 border-red-700 active:scale-95 self-center mb-2">PAUSE</button>
+            </div>
           )}
+          
           {gamePhase === GamePhase.IDLE && (
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-40">
               <div className="bg-white p-6 rounded-xl shadow-2xl flex flex-col gap-4 min-w-[250px]">
@@ -110,7 +167,7 @@ const HUD = () => {
 };
 
 const LevelComplete = () => {
-  const { score, coins, misses, tiles, appMode, currentLevel, advanceLevel, retryLevel, exitToMenu, buyDecoration, inventory } = useGameStore();
+  const { score, coins, misses, tiles, appMode, currentLevel, advanceLevel, retryLevel, exitToMenu, buyDecoration, inventory, fenceCount } = useGameStore();
   const treeCount = tiles.filter(t => t.stage !== GrowthStage.DIRT).length;
   const weedCount = tiles.filter(t => t.status === TileStatus.WEED).length;
 
@@ -147,21 +204,31 @@ const LevelComplete = () => {
            <h3 className="text-xl font-bold text-amber-800 mb-2">Farm Shop</h3>
            <div className="bg-white/80 p-2 rounded mb-4 font-bold text-orange-600 border border-orange-200">Wallet: {coins} Coins</div>
            <div className="space-y-2 overflow-y-auto max-h-[300px]">
-              {SHOP_ITEMS.map((item) => (
-                <button 
-                  key={item.type}
-                  onClick={() => buyDecoration(item.type)}
-                  disabled={coins < item.price || inventory.includes(item.type)}
-                  className="w-full flex justify-between items-center p-3 bg-white border border-gray-200 rounded hover:bg-orange-50 disabled:opacity-50 disabled:bg-gray-100"
-                >
-                  <span className="font-bold text-gray-700">{item.icon} {item.name}</span>
-                  {inventory.includes(item.type) ? (
-                    <span className="text-green-600 text-sm font-bold">Owned</span>
-                  ) : (
-                    <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-sm font-bold">{item.price} c</span>
-                  )}
-                </button>
-              ))}
+              {SHOP_ITEMS.map((item) => {
+                  const isOwned = !item.isConsumable && inventory.includes(item.type);
+                  const isMaxFences = item.type === DecorationType.FENCE && fenceCount >= GAME_CONSTANTS.MAX_FENCES;
+                  
+                  return (
+                    <button 
+                      key={item.type}
+                      onClick={() => buyDecoration(item.type)}
+                      disabled={coins < item.price || isOwned || isMaxFences}
+                      className="w-full flex justify-between items-center p-3 bg-white border border-gray-200 rounded hover:bg-orange-50 disabled:opacity-50 disabled:bg-gray-100"
+                    >
+                      <span className="font-bold text-gray-700 flex items-center gap-2">
+                          {item.icon} {item.name}
+                          {item.isConsumable && item.type === DecorationType.FENCE && <span className="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full">Have: {fenceCount}/{GAME_CONSTANTS.MAX_FENCES}</span>}
+                      </span>
+                      {isOwned ? (
+                        <span className="text-green-600 text-sm font-bold">Owned</span>
+                      ) : isMaxFences ? (
+                        <span className="text-red-500 text-sm font-bold">Max</span>
+                      ) : (
+                        <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-sm font-bold">{item.price} c</span>
+                      )}
+                    </button>
+                  );
+              })}
            </div>
            <div className="mt-4 text-xs text-gray-500 text-center">Purchased items appear in your Farm Base!</div>
         </div>
@@ -175,6 +242,7 @@ export const UIOverlay: React.FC = () => {
   const { appMode, gamePhase } = useGameStore();
 
   if (appMode === AppMode.MENU) return <MainMenu />;
+  if (appMode === AppMode.VICTORY) return <VictoryScreen />;
   if (appMode === AppMode.LEVEL_SELECT && gamePhase === GamePhase.IDLE) return <LevelSelect />;
   if (gamePhase === GamePhase.INTRO_TEXT) return <StoryIntro />;
   if (gamePhase === GamePhase.LEVEL_COMPLETE) return <LevelComplete />;

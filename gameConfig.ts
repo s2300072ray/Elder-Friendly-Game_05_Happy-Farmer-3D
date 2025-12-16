@@ -2,10 +2,20 @@ import { LevelConfig, Season, AtmosphereConfig, ShopItemConfig, DecorationType }
 
 // --- ECONOMY SETTINGS ---
 export const SHOP_ITEMS: ShopItemConfig[] = [
-  { type: DecorationType.HOUSE, name: "Farmhouse", price: 20, icon: "🏠" },
-  { type: DecorationType.WINDMILL, name: "Windmill", price: 40, icon: "🌪" },
-  { type: DecorationType.WATER_WHEEL, name: "Water Wheel", price: 40, icon: "💧" },
+  { type: DecorationType.FENCE, name: "Fence (20s)", price: 15, icon: "🚧", isConsumable: true },
+  { type: DecorationType.HOUSE, name: "Farmhouse", price: 50, icon: "🏠" },
+  { type: DecorationType.WINDMILL, name: "Windmill", price: 100, icon: "🌪" },
+  { type: DecorationType.WATER_WHEEL, name: "Water Wheel", price: 100, icon: "💧" },
 ];
+
+// --- AUDIO SETTINGS ---
+export const AUDIO_CONFIG = {
+  // Gentle, royalty-free acoustic track.
+  // Source: Pixabay (Royalty Free) - "Relaxing Light Background" type
+  BGM_URL: "https://cdn.pixabay.com/audio/2022/10/18/audio_31c2730e64.mp3",
+  BGM_VOLUME: 0.3,
+  SFX_VOLUME: 0.4
+};
 
 // --- LEVEL SETTINGS ---
 export const LEVELS: Record<number, LevelConfig> = {
@@ -71,6 +81,8 @@ export const GAME_CONSTANTS = {
   BEAR_SPAWN_CHANCE: 0.25,
   BEAR_ATTACK_DELAY: 2000, // ms
   TARGET_TIMEOUT: 2000, // ms (How long a yellow light stays)
+  FENCE_DURATION: 20000, // 20 seconds
+  MAX_FENCES: 4, // Limit fence purchase
   POINTS_HARVEST: 50,
   POINTS_GROW: 10,
   POINTS_SHOO_BEAR: 100,

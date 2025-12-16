@@ -2,11 +2,9 @@ import React from 'react';
 import { Canvas } from '@react-three/fiber';
 import { GameScene } from './components/GameScene';
 import { UIOverlay } from './components/UIOverlay';
-// import { useGameStore } from './store'; // No longer needed for init
+import { AudioController } from './components/AudioController';
 
 const App: React.FC = () => {
-  // Logic is now driven by the Menu UI starting the game
-  
   return (
     <div className="relative w-full h-full bg-sky-300 overflow-hidden">
       {/* 
@@ -25,6 +23,9 @@ const App: React.FC = () => {
 
       {/* 2D HUD LAYER */}
       <UIOverlay />
+      
+      {/* LOGIC LAYERS */}
+      <AudioController />
     </div>
   );
 };

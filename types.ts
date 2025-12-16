@@ -1,3 +1,50 @@
+import { ThreeElements } from '@react-three/fiber';
+
+// Augment both global and React-scoped JSX namespaces to support R3F elements
+declare global {
+  namespace JSX {
+    interface IntrinsicElements {
+      group: any;
+      mesh: any;
+      cylinderGeometry: any;
+      meshStandardMaterial: any;
+      capsuleGeometry: any;
+      dodecahedronGeometry: any;
+      sphereGeometry: any;
+      boxGeometry: any;
+      coneGeometry: any;
+      circleGeometry: any;
+      planeGeometry: any;
+      directionalLight: any;
+      ambientLight: any;
+      fog: any;
+      color: any;
+    }
+  }
+}
+
+declare module 'react' {
+  namespace JSX {
+    interface IntrinsicElements {
+      group: any;
+      mesh: any;
+      cylinderGeometry: any;
+      meshStandardMaterial: any;
+      capsuleGeometry: any;
+      dodecahedronGeometry: any;
+      sphereGeometry: any;
+      boxGeometry: any;
+      coneGeometry: any;
+      circleGeometry: any;
+      planeGeometry: any;
+      directionalLight: any;
+      ambientLight: any;
+      fog: any;
+      color: any;
+    }
+  }
+}
+
 export enum GrowthStage {
   DIRT = 0,
   SEEDLING = 1,
@@ -21,13 +68,15 @@ export enum Season {
 export enum DecorationType {
   HOUSE = 'HOUSE',
   WINDMILL = 'WINDMILL',
-  WATER_WHEEL = 'WATER_WHEEL'
+  WATER_WHEEL = 'WATER_WHEEL',
+  FENCE = 'FENCE' // Consumable Item
 }
 
 export enum AppMode {
   MENU = 'MENU',
   STORY = 'STORY',
-  LEVEL_SELECT = 'LEVEL_SELECT'
+  LEVEL_SELECT = 'LEVEL_SELECT',
+  VICTORY = 'VICTORY' // Game Complete Screen
 }
 
 export enum GamePhase {
@@ -56,6 +105,12 @@ export interface BearData {
   targetTileId?: number; // The crop the bear intends to eat
 }
 
+export interface ActiveFence {
+  id: number;
+  protectedTileIds: number[];
+  expiresAt: number;
+}
+
 export interface LevelConfig {
   levelNumber: number;
   tileCount: number; // Grid size
@@ -80,6 +135,7 @@ export interface ShopItemConfig {
   name: string;
   price: number;
   icon: string;
+  isConsumable?: boolean;
 }
 
 export interface GameState {
@@ -87,19 +143,25 @@ export interface GameState {
   appMode: AppMode;
   gamePhase: GamePhase;
   currentLevel: number;
+  isMuted: boolean; 
   
   // Game Objects
   tiles: TileData[];
   bearData: BearData | null;
+  activeFences: ActiveFence[]; // New: Active protection zones
   
   // Player Stats
   score: number;
   coins: number;
   misses: number;
   bearsShooed: number;
-  inventory: DecorationType[];
+  inventory: DecorationType[]; // Permanent items
+  fenceCount: number; // New: Consumable count
   timeLeft: number; 
   
+  // Interaction State
+  isPlacingFence: boolean; // New: UI State
+
   // Actions - System
   setAppMode: (mode: AppMode) => void;
   startStoryMode: () => void;
@@ -110,11 +172,13 @@ export interface GameState {
   stopGame: () => void;
   resumeGame: () => void;
   exitToMenu: () => void;
+  toggleMute: () => void;
   
   // Actions - Gameplay
   tickTimer: (delta: number) => void;
   triggerNextBeat: () => void;
   handleTileClick: (id: number) => void;
+  toggleFencePlacement: () => void; // New action
   
   // Actions - Entities
   spawnBear: () => void;

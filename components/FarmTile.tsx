@@ -4,6 +4,7 @@ import { Color, Mesh } from 'three';
 import { TileData, TileStatus } from '../types';
 import { useGameStore } from '../store';
 import { Crop } from './Crop';
+import { FenceObject } from './FenceObject';
 
 interface FarmTileProps {
   data: TileData;
@@ -27,7 +28,7 @@ const Weed: React.FC = () => {
 
 export const FarmTile: React.FC<FarmTileProps> = ({ data, position }) => {
   const meshRef = useRef<Mesh>(null);
-  const { handleTileClick, bearData } = useGameStore();
+  const { handleTileClick, bearData, activeFences } = useGameStore();
   const [hovered, setHovered] = useState(false);
 
   // Derived state
@@ -35,6 +36,9 @@ export const FarmTile: React.FC<FarmTileProps> = ({ data, position }) => {
   const isWeed = data.status === TileStatus.WEED;
   // Check if this tile is the specific target of the active bear
   const isBearTarget = bearData?.targetTileId === data.id;
+  
+  // Check if protected
+  const isProtected = activeFences.some(f => f.protectedTileIds.includes(data.id));
 
   // Animation logic
   useFrame((state) => {
@@ -53,7 +57,6 @@ export const FarmTile: React.FC<FarmTileProps> = ({ data, position }) => {
 
       if (isBearTarget) {
         // High priority: Bear is attacking this tile!
-        // Pale Red Background + Pulsing Red Emissive
         const pulse = Math.sin(state.clock.elapsedTime * 10) * 0.5 + 0.5; // Faster pulse
         targetColor = new Color("#FFCDD2"); // Pale Red
         targetEmissive = new Color("#FF0000"); // Red Warning
@@ -106,6 +109,7 @@ export const FarmTile: React.FC<FarmTileProps> = ({ data, position }) => {
       {/* The Crop or Weed sits on top */}
       <group position={[0, 0.1, 0]}>
          {isWeed ? <Weed /> : <Crop stage={data.stage} />}
+         {isProtected && <FenceObject />}
       </group>
     </group>
   );
