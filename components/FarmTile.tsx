@@ -27,18 +27,20 @@ const Weed: React.FC = () => {
 
 export const FarmTile: React.FC<FarmTileProps> = ({ data, position }) => {
   const meshRef = useRef<Mesh>(null);
-  const { handleTileClick } = useGameStore();
+  const { handleTileClick, bearData } = useGameStore();
   const [hovered, setHovered] = useState(false);
 
   // Derived state
   const isTarget = data.status === TileStatus.GROWTH_TARGET;
   const isWeed = data.status === TileStatus.WEED;
+  // Check if this tile is the specific target of the active bear
+  const isBearTarget = bearData?.targetTileId === data.id;
 
   // Animation logic
   useFrame((state) => {
     if (meshRef.current) {
       // Gentle bobbing if active
-      const isActive = isTarget || isWeed;
+      const isActive = isTarget || isWeed || isBearTarget;
       const targetY = position[1] + (isActive ? Math.sin(state.clock.elapsedTime * 5) * 0.1 + 0.1 : 0);
       meshRef.current.position.y += (targetY - meshRef.current.position.y) * 0.1;
 
@@ -49,7 +51,14 @@ export const FarmTile: React.FC<FarmTileProps> = ({ data, position }) => {
       let targetEmissive = new Color("#000000");
       let targetEmissiveIntensity = 0;
 
-      if (isTarget) {
+      if (isBearTarget) {
+        // High priority: Bear is attacking this tile!
+        // Pale Red Background + Pulsing Red Emissive
+        const pulse = Math.sin(state.clock.elapsedTime * 10) * 0.5 + 0.5; // Faster pulse
+        targetColor = new Color("#FFCDD2"); // Pale Red
+        targetEmissive = new Color("#FF0000"); // Red Warning
+        targetEmissiveIntensity = 0.5 + (pulse * 0.5); // 0.5 to 1.0 intensity
+      } else if (isTarget) {
         // Gold/Yellow glow for growth target
         targetColor = new Color("#D2691E"); 
         targetEmissive = new Color("#FFD700"); 

@@ -1,5 +1,3 @@
-import React from 'react';
-
 export enum GrowthStage {
   DIRT = 0,
   SEEDLING = 1,
@@ -8,40 +6,10 @@ export enum GrowthStage {
   HARVESTED = 4
 }
 
-// Tile status helps distinguish between a normal growth target and a weed target
 export enum TileStatus {
   IDLE = 'IDLE',
-  GROWTH_TARGET = 'GROWTH_TARGET', // Yellow Light
-  WEED = 'WEED' // Red Light (Persistent until clicked)
-}
-
-export interface TileData {
-  id: number;
-  row: number;
-  col: number;
-  stage: GrowthStage;
-  status: TileStatus; // Replaces simple "active" check
-  activeSince?: number; // Timestamp when status changed to non-IDLE
-}
-
-export interface BearData {
-  id: number;
-  position: [number, number, number];
-  rotationY: number;
-  createdAt: number;
-}
-
-export enum AppMode {
-  MENU = 'MENU',
-  STORY = 'STORY',
-  LEVEL_SELECT = 'LEVEL_SELECT'
-}
-
-export enum GamePhase {
-  IDLE = 'IDLE', // In menu or waiting
-  INTRO_TEXT = 'INTRO_TEXT', // Reading story
-  PLAYING = 'PLAYING', // Game active
-  LEVEL_COMPLETE = 'LEVEL_COMPLETE', // Finished level
+  GROWTH_TARGET = 'GROWTH_TARGET', // Yellow Light (Bonus)
+  WEED = 'WEED' // Red Light (Penalty/Blocker)
 }
 
 export enum Season {
@@ -56,55 +24,103 @@ export enum DecorationType {
   WATER_WHEEL = 'WATER_WHEEL'
 }
 
+export enum AppMode {
+  MENU = 'MENU',
+  STORY = 'STORY',
+  LEVEL_SELECT = 'LEVEL_SELECT'
+}
+
+export enum GamePhase {
+  IDLE = 'IDLE', // Menu or Paused
+  INTRO_TEXT = 'INTRO_TEXT', // Reading story before level
+  PLAYING = 'PLAYING', // Active gameplay
+  LEVEL_COMPLETE = 'LEVEL_COMPLETE', // Summary screen
+}
+
+// --- Data Interfaces ---
+
+export interface TileData {
+  id: number;
+  row: number;
+  col: number;
+  stage: GrowthStage;
+  status: TileStatus; 
+  activeSince?: number; // Timestamp for timeout logic
+}
+
+export interface BearData {
+  id: number;
+  position: [number, number, number];
+  rotationY: number;
+  createdAt: number;
+  targetTileId?: number; // The crop the bear intends to eat
+}
+
 export interface LevelConfig {
   levelNumber: number;
-  tileCount: number; // 9, 16, 25
-  duration: number; // seconds
-  simultaneousTargets: number;
-  speed: number; // ms
-  gridBoundary: number; // Limit for random placement
+  tileCount: number; // Grid size
+  duration: number; // Seconds
+  simultaneousTargets: number; // Max active events
+  beatSpeed: number; // Interval between events (ms)
+  gridBoundary: number; // Map spread
   season: Season;
+  storyText: string;
+}
+
+export interface AtmosphereConfig {
+  fogColor: string;
+  fogNear: number;
+  fogFar: number;
+  groundColor: string;
+  envPreset: "sunset" | "park" | "forest" | "night" | "studio" | "city" | "apartment" | "dawn" | "lobby" | "warehouse";
+}
+
+export interface ShopItemConfig {
+  type: DecorationType;
+  name: string;
+  price: number;
+  icon: string;
 }
 
 export interface GameState {
+  // System State
   appMode: AppMode;
   gamePhase: GamePhase;
-  currentLevel: number; // 1, 2, 3
+  currentLevel: number;
   
+  // Game Objects
   tiles: TileData[];
-  score: number;
-  misses: number; // New: Track missed targets
-  coins: number; // Currency
-  inventory: DecorationType[]; // Purchased items
-  
-  bearsShooed: number;
-  // removed activeTileIds in favor of TileData.status for more complex state
-  
-  timeLeft: number; // Remaining seconds
-  
   bearData: BearData | null;
   
-  // Actions
+  // Player Stats
+  score: number;
+  coins: number;
+  misses: number;
+  bearsShooed: number;
+  inventory: DecorationType[];
+  timeLeft: number; 
+  
+  // Actions - System
   setAppMode: (mode: AppMode) => void;
   startStoryMode: () => void;
   startLevelSelect: () => void;
   startLevel: (levelIndex: number) => void;
   advanceLevel: () => void;
   retryLevel: () => void;
-  stopGame: () => void; // Pause
+  stopGame: () => void;
   resumeGame: () => void;
   exitToMenu: () => void;
   
-  // Economy Actions
-  buyDecoration: (type: DecorationType, cost: number) => void;
-  
-  // Game Loop Actions
-  tickTimer: (delta: number) => void; // Decrease time
+  // Actions - Gameplay
+  tickTimer: (delta: number) => void;
+  triggerNextBeat: () => void;
   handleTileClick: (id: number) => void;
-  triggerNextBeat: () => void; // Called by GameScene to light up tiles
   
-  // Bear Actions
+  // Actions - Entities
   spawnBear: () => void;
   shooBear: () => void;
   bearAttack: () => void;
+  
+  // Actions - Economy
+  buyDecoration: (type: DecorationType) => void;
 }
